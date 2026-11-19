@@ -4,6 +4,8 @@ import { useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 
+export const dynamic = 'force-dynamic';
+
 interface Profile {
   id: string;
   artistic_name: string;
@@ -56,7 +58,7 @@ export default function ProfileDetailPage() {
 
   const fetchProfileAndReviews = async () => {
     setLoading(true);
-    
+
     // Buscar perfil e mídias diretamente da tabela profiles
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
@@ -127,8 +129,8 @@ export default function ProfileDetailPage() {
   }
 
   const totalReviews = reviews.length;
-  const averageRating = totalReviews > 0 
-    ? (reviews.reduce((acc, r) => acc + r.rating, 0) / totalReviews).toFixed(1) 
+  const averageRating = totalReviews > 0
+    ? (reviews.reduce((acc, r) => acc + r.rating, 0) / totalReviews).toFixed(1)
     : '5.0';
 
   return (
@@ -149,13 +151,13 @@ export default function ProfileDetailPage() {
       </header>
 
       <div className="max-w-2xl mx-auto px-2 sm:px-4 py-6 space-y-6">
-        
+
         {/* GALERIA EM LISTA VERTICAL */}
         <div className="w-full space-y-4">
           {profile.photos && profile.photos.length > 0 ? (
             profile.photos.map((url, idx) => (
-              <div 
-                key={idx} 
+              <div
+                key={idx}
                 className="w-full rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 shadow-xl relative"
               >
                 {url.includes('.mp4') || url.includes('.mov') ? (
