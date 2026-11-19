@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
@@ -36,7 +36,7 @@ interface Review {
   created_at: string;
 }
 
-export default function ProfileDetailPage() {
+function ProfileDetailContent() {
   const params = useParams();
   const id = params?.id as string;
 
@@ -336,5 +336,19 @@ export default function ProfileDetailPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function ProfileDetailPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-zinc-400 text-xs">
+          A carregar perfil...
+        </div>
+      }
+    >
+      <ProfileDetailContent />
+    </Suspense>
   );
 }
