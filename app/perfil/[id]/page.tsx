@@ -98,7 +98,7 @@ export default function ProfileDetailPage() {
     if (error) {
       alert('Erro ao enviar avaliação: ' + error.message);
     } else {
-      alert('Avaliação enviada com sucesso! Ficará visível assim que for aprovada pela anunciante.');
+      alert('Avaliação enviada com sucesso! Ficará visível assim que for aprovada.');
       setVisitorName('');
       setComment('');
       setRating(5);
@@ -119,7 +119,7 @@ export default function ProfileDetailPage() {
     return (
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center text-zinc-400 text-xs gap-4 p-4 text-center">
         <p>Perfil não encontrado ou desativado.</p>
-        <Link href="/" className="bg-red-600 text-white px-4 py-2 rounded-xl text-xs font-bold">
+        <Link href="/" className="bg-rose-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-rose-600/25">
           Voltar à Vitrine
         </Link>
       </div>
@@ -133,48 +133,50 @@ export default function ProfileDetailPage() {
 
   return (
     <main className="min-h-screen bg-zinc-950 text-white pb-20">
-      {/* CABEÇALHO */}
-      <header className="max-w-4xl mx-auto flex items-center justify-between px-4 py-4 border-b border-zinc-800">
-        <Link href="/" className="text-lg font-black tracking-widest text-red-600">
-          CLICK<span className="text-white">VIP</span>
+      {/* CABEÇALHO - MODELO 360 */}
+      <header className="max-w-4xl mx-auto flex items-center justify-between px-4 py-4 border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-md sticky top-0 z-40">
+        <Link href="/" className="flex items-center gap-2 group">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-rose-600 via-red-600 to-amber-500 flex items-center justify-center text-white font-black text-xs shadow-md shadow-rose-600/30">
+            360
+          </div>
+          <span className="text-base font-black tracking-wider bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
+            MODELO<span className="text-rose-500 ml-1">360</span>
+          </span>
         </Link>
         <Link href="/" className="text-xs text-zinc-400 hover:text-white transition">
           ← Voltar à vitrine
         </Link>
       </header>
 
-      <div className="max-w-4xl mx-auto px-2 sm:px-4 py-6 space-y-6">
+      <div className="max-w-2xl mx-auto px-2 sm:px-4 py-6 space-y-6">
         
-        {/* CARROSSEL / SCROLL HORIZONTAL OTIMIZADO PARA MOBILE */}
-        <div className="w-full">
-          <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-4 scrollbar-none rounded-2xl">
-            {profile.photos && profile.photos.length > 0 ? (
-              profile.photos.map((url, idx) => (
-                <div 
-                  key={idx} 
-                  className="flex-shrink-0 w-[85%] sm:w-[60%] md:w-[50%] aspect-[3/4] rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 shadow-xl snap-center relative"
-                >
-                  {url.includes('.mp4') || url.includes('.mov') ? (
-                    <video src={url} className="w-full h-full object-cover" controls muted />
-                  ) : (
-                    <img src={url} alt={`Mídia ${idx + 1}`} className="w-full h-full object-cover" />
-                  )}
-                  <span className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-bold text-zinc-300">
-                    {idx + 1} / {profile.photos.length}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <div className="w-full aspect-[3/4] rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 shadow-xl">
-                <img
-                  src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800"
-                  alt="Padrão"
-                  className="w-full h-full object-cover"
-                />
+        {/* GALERIA EM LISTA VERTICAL */}
+        <div className="w-full space-y-4">
+          {profile.photos && profile.photos.length > 0 ? (
+            profile.photos.map((url, idx) => (
+              <div 
+                key={idx} 
+                className="w-full rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 shadow-xl relative"
+              >
+                {url.includes('.mp4') || url.includes('.mov') ? (
+                  <video src={url} className="w-full h-auto object-cover max-h-[600px]" controls muted />
+                ) : (
+                  <img src={url} alt={`Mídia ${idx + 1}`} className="w-full h-auto object-cover max-h-[600px]" />
+                )}
+                <span className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-bold text-zinc-300 border border-zinc-800">
+                  {idx + 1} / {profile.photos.length}
+                </span>
               </div>
-            )}
-          </div>
-          <p className="text-center text-[11px] text-zinc-500 mt-1">← Deslize para ver mais fotos e vídeos →</p>
+            ))
+          ) : (
+            <div className="w-full aspect-[3/4] rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 shadow-xl">
+              <img
+                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800"
+                alt="Padrão"
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
         </div>
 
         {/* CARTÃO DE IDENTIFICAÇÃO E CONTACTO */}
@@ -186,22 +188,24 @@ export default function ProfileDetailPage() {
                 ⭐ {averageRating} ({totalReviews})
               </span>
             </div>
-            <p className="text-xs text-zinc-400">📍 {profile.neighborhood || 'Centro'} • {profile.city || 'São Paulo'}</p>
+            <p className="text-xs text-zinc-400">
+              📍 {profile.neighborhood || 'Centro'} - {profile.city || 'São Paulo'}
+            </p>
           </div>
 
           {profile.price && (
             <div className="flex items-center justify-between pt-3 border-t border-zinc-800">
               <span className="text-xs text-zinc-400">Preço Base</span>
-              <span className="text-lg font-black text-emerald-400">R$ {profile.price}</span>
+              <span className="text-lg font-black text-emerald-400">R$ {profile.price} / h</span>
             </div>
           )}
 
           {profile.whatsapp && (
             <a
-              href={`https://wa.me/55${profile.whatsapp.replace(/\D/g, '')}?text=Olá%20${encodeURIComponent(profile.artistic_name || '')},%20vi%20seu%20anúncio%20no%20ClickVIP.`}
+              href={`https://wa.me/55${profile.whatsapp.replace(/\D/g, '')}?text=Olá%20${encodeURIComponent(profile.artistic_name || '')},%20vi%20seu%20anúncio%20no%20Modelo360.`}
               target="_blank"
               rel="noopener noreferrer"
-              className="block w-full text-center rounded-xl bg-emerald-600 py-3.5 text-xs font-bold text-white hover:bg-emerald-500 transition shadow-lg shadow-emerald-600/20"
+              className="block w-full text-center rounded-xl bg-emerald-600 py-3.5 text-xs font-bold text-white hover:bg-emerald-500 transition shadow-lg shadow-emerald-600/25"
             >
               💬 Contactar via WhatsApp
             </a>
@@ -210,7 +214,7 @@ export default function ProfileDetailPage() {
 
         {/* ATRIBUTOS FÍSICOS */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-3 shadow-xl">
-          <h2 className="text-xs font-bold text-red-500 uppercase tracking-wider">📋 Características</h2>
+          <h2 className="text-xs font-bold text-rose-500 uppercase tracking-wider">📋 Características</h2>
           <div className="flex flex-wrap gap-2">
             {profile.etnia && (
               <span className="bg-zinc-950 border border-zinc-800 text-zinc-300 text-xs px-3 py-1.5 rounded-xl">
@@ -237,7 +241,7 @@ export default function ProfileDetailPage() {
 
         {/* ATENDIMENTO A */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-3 shadow-xl">
-          <h2 className="text-xs font-bold text-red-500 uppercase tracking-wider">✨ Atendimento a</h2>
+          <h2 className="text-xs font-bold text-rose-500 uppercase tracking-wider">✨ Atendimento a</h2>
           <div className="flex flex-wrap gap-1.5">
             {profile.atende_homens && <span className="bg-zinc-950 border border-zinc-800 text-zinc-300 text-xs px-3 py-1.5 rounded-xl">✓ Homens</span>}
             {profile.atende_mulheres && <span className="bg-zinc-950 border border-zinc-800 text-zinc-300 text-xs px-3 py-1.5 rounded-xl">✓ Mulheres</span>}
@@ -249,7 +253,7 @@ export default function ProfileDetailPage() {
         {/* BIOGRAFIA */}
         {profile.bio && (
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-3 shadow-xl">
-            <h2 className="text-xs font-bold text-red-500 uppercase tracking-wider">Sobre o Atendimento</h2>
+            <h2 className="text-xs font-bold text-rose-500 uppercase tracking-wider">Sobre o Atendimento</h2>
             <p className="text-xs text-zinc-300 whitespace-pre-line leading-relaxed">{profile.bio}</p>
           </div>
         )}
@@ -287,7 +291,7 @@ export default function ProfileDetailPage() {
                   value={visitorName}
                   onChange={(e) => setVisitorName(e.target.value)}
                   placeholder="Ex: Carlos M."
-                  className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2.5 text-xs text-white focus:outline-none focus:border-red-600"
+                  className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2.5 text-xs text-white focus:outline-none focus:border-rose-600"
                 />
               </div>
 
@@ -296,7 +300,7 @@ export default function ProfileDetailPage() {
                 <select
                   value={rating}
                   onChange={(e) => setRating(Number(e.target.value))}
-                  className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2.5 text-xs text-white focus:outline-none focus:border-red-600"
+                  className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2.5 text-xs text-white focus:outline-none focus:border-rose-600"
                 >
                   <option value={5}>⭐⭐⭐⭐⭐ (Excelente)</option>
                   <option value={4}>⭐⭐⭐⭐ (Muito Bom)</option>
@@ -314,14 +318,14 @@ export default function ProfileDetailPage() {
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                   placeholder="Conte como foi o atendimento..."
-                  className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2.5 text-xs text-white focus:outline-none focus:border-red-600"
+                  className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2.5 text-xs text-white focus:outline-none focus:border-rose-600"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={submittingReview}
-                className="w-full rounded-xl bg-red-600 py-3 text-xs font-bold text-white hover:bg-red-700 transition cursor-pointer disabled:opacity-50"
+                className="w-full rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 py-3 text-xs font-bold text-white transition cursor-pointer disabled:opacity-50 shadow-lg shadow-rose-600/25"
               >
                 {submittingReview ? 'A enviar...' : 'Enviar Avaliação para Moderação'}
               </button>

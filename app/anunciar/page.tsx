@@ -12,6 +12,7 @@ export default function AnunciarPage() {
   const [paying, setPaying] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [detectingLocation, setDetectingLocation] = useState(false);
 
   const [formData, setFormData] = useState({
     artistic_name: '',
@@ -38,6 +39,8 @@ export default function AnunciarPage() {
     corpo: '',
     bio: '',
     photos: [] as string[],
+    latitude: null as number | null,
+    longitude: null as number | null,
   });
 
   const [planoSelecionado, setPlanoSelecionado] = useState({
@@ -89,6 +92,8 @@ export default function AnunciarPage() {
           corpo: profileData.corpo || '',
           bio: profileData.bio || '',
           photos: profileData.photos || [],
+          latitude: profileData.latitude || null,
+          longitude: profileData.longitude || null,
         });
       }
 
@@ -98,7 +103,49 @@ export default function AnunciarPage() {
     loadUserDataAndProfile();
   }, [router]);
 
-  // Função para gerar uma hash baseada no conteúdo e tamanho do ficheiro
+  // Função para detetar localização via GPS e Nominatim (OpenStreetMap)
+  const handleDetectLocation = () => {
+    if (!('geolocation' in navigator)) {
+      alert('Geolocalização não suportada pelo seu navegador.');
+      return;
+    }
+
+    setDetectingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=14&addressdetails=1`);
+          const data = await res.json();
+          if (data && data.address) {
+            const detectedCity = data.address.city || data.address.town || data.address.municipality || 'São Paulo';
+            const detectedNeighborhood = data.address.suburb || data.address.neighbourhood || data.address.residential || '';
+            
+            setFormData(prev => ({
+              ...prev,
+              city: detectedCity,
+              neighborhood: detectedNeighborhood || prev.neighborhood,
+              latitude: lat,
+              longitude: lon,
+            }));
+            alert('📍 Localização e coordenadas detectadas com sucesso!');
+          }
+        } catch (e) {
+          alert('Não foi possível obter o endereço exato.');
+        } finally {
+          setDetectingLocation(false);
+        }
+      },
+      (error) => {
+        setDetectingLocation(false);
+        alert('Permissão de localização negada ou indisponível.');
+      },
+      { timeout: 10000 }
+    );
+  };
+
   const getFileHash = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -112,7 +159,6 @@ export default function AnunciarPage() {
     });
   };
 
-  // Comprimir imagem
   const compressImage = (file: File): Promise<Blob> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -158,7 +204,6 @@ export default function AnunciarPage() {
     });
   };
 
-  // Validar duração de vídeo (máx 15s)
   const checkVideoDuration = (file: File): Promise<boolean> => {
     return new Promise((resolve) => {
       const video = document.createElement('video');
@@ -193,7 +238,7 @@ export default function AnunciarPage() {
         const isAlreadyUploaded = newPhotos.some(url => url.includes(fileHash) || url.includes(file.name.replace(/\s+/g, '-')));
         
         if (isAlreadyUploaded) {
-          alert(`⚠️ A mídia "${file.name}" já está presente no seu perfil e foi rejeitada para evitar duplicidade.`);
+          alert(`⚠️ A mídia "${file.name}" já está presente no seu perfil e foi rejeitada.`);
           continue;
         }
 
@@ -246,7 +291,7 @@ export default function AnunciarPage() {
 
     const uniquePhotos = Array.from(new Set(formData.photos));
     if (uniquePhotos.length !== formData.photos.length) {
-      alert('⚠️ Foram detetadas mídias duplicadas. Por favor, remova as cópias antes de guardar.');
+      alert('⚠️ Foram detetadas mídias duplicadas. Por favor, remova as cópias.');
       setFormData({ ...formData, photos: uniquePhotos });
       return;
     }
@@ -285,6 +330,9 @@ export default function AnunciarPage() {
         corpo: formData.corpo,
         bio: formData.bio,
         photos: uniquePhotos,
+        latitude: formData.latitude,
+        longitude: formData.longitude,
+        last_seen_at: new Date().toISOString(),
       };
 
       const { data, error } = await supabase.from('profiles').upsert(payload, { onConflict: 'user_id' }).select().single();
@@ -293,7 +341,7 @@ export default function AnunciarPage() {
         alert('Erro ao guardar perfil: ' + error.message);
       } else {
         if (data) setProfileId(data.id);
-        alert('Perfil e mídias guardados com sucesso!');
+        alert('✨ Perfil e mídias guardados com sucesso no Modelo 360!');
       }
     } catch (err) {
       alert('Erro de conexão com a base de dados.');
@@ -308,7 +356,7 @@ export default function AnunciarPage() {
       return;
     }
     if (formData.photos.length < 5) {
-      alert('⚠️ É obrigatório ter pelo menos 5 fotos ou vídeos carregados para prosseguir com a ativação.');
+      alert('⚠️ É obrigatório ter pelo menos 5 fotos ou vídeos carregados.');
       return;
     }
 
@@ -338,17 +386,16 @@ export default function AnunciarPage() {
     }
   };
 
-  // Botão de simulação grátis para testes locais
   const handleSimularPagamentoGratis = () => {
     if (!formData.artistic_name.trim() || !profileId) {
-      alert('⚠️ Preencha o Nome Artístico e guarde o perfil antes de simular o pagamento.');
+      alert('⚠️ Preencha o Nome Artístico e guarde o perfil antes de simular.');
       return;
     }
     if (formData.photos.length < 5) {
-      alert('⚠️ É obrigatório ter pelo menos 5 fotos ou vídeos guardados para simular a ativação.');
+      alert('⚠️ É obrigatório ter pelo menos 5 fotos ou vídeos guardados.');
       return;
     }
-    alert('🧪 [MODO DE TESTE] Pagamento simulado com sucesso! Perfil ativado.');
+    alert('🧪 [MODO DE TESTE] Pagamento simulado com sucesso no Modelo 360!');
     router.push('/');
   };
 
@@ -363,9 +410,16 @@ export default function AnunciarPage() {
   return (
     <main className="min-h-screen bg-zinc-950 text-white p-6">
       <div className="max-w-4xl mx-auto space-y-6">
+        
+        {/* HEADER MODELO 360 */}
         <header className="flex items-center justify-between border-b border-zinc-800 pb-4">
-          <Link href="/" className="text-xl font-black tracking-widest text-red-600">
-            CLICK<span className="text-white">VIP</span>
+          <Link href="/" className="flex items-center gap-2 group">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-rose-600 via-red-600 to-amber-500 flex items-center justify-center text-white font-black text-xs shadow-md shadow-rose-600/30">
+              360
+            </div>
+            <span className="text-base font-black tracking-wider bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
+              MODELO<span className="text-rose-500 ml-1">360</span>
+            </span>
           </Link>
           <div className="flex items-center gap-4">
             <span className="text-xs text-zinc-400">{user?.email}</span>
@@ -374,18 +428,18 @@ export default function AnunciarPage() {
                 await supabase.auth.signOut();
                 router.push('/login');
               }}
-              className="text-xs text-red-500 hover:underline cursor-pointer"
+              className="text-xs text-rose-500 hover:underline cursor-pointer"
             >
               Sair
             </button>
           </div>
         </header>
 
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-8">
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-8 shadow-xl">
           <div>
-            <h1 className="text-lg font-bold">Painel Completo da Anunciante</h1>
+            <h1 className="text-lg font-bold">Painel da Anunciante — Modelo 360</h1>
             <p className="text-xs text-zinc-400 mt-1">
-              Envie no mínimo 5 fotos ou vídeos únicos. Mídias duplicadas são rejeitadas automaticamente pelo sistema.
+              Envie no mínimo 5 fotos ou vídeos únicos. Ative a geolocalização para os clientes encontrarem seu bairro com precisão.
             </p>
           </div>
 
@@ -394,12 +448,12 @@ export default function AnunciarPage() {
             {/* GESTÃO DE FOTOS E VÍDEOS */}
             <div className="space-y-4 bg-zinc-950 p-4 rounded-xl border border-zinc-800">
               <div className="flex justify-between items-center">
-                <h2 className="text-sm font-bold text-red-500 uppercase tracking-wider">Fotos e Vídeos (Mínimo 5 obrigatórios)</h2>
-                <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${formData.photos.length >= 5 ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-red-950 text-red-400 border border-red-800'}`}>
+                <h2 className="text-sm font-bold text-rose-500 uppercase tracking-wider">Fotos e Vídeos (Mínimo 5 obrigatórios)</h2>
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${formData.photos.length >= 5 ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400 border border-rose-800'}`}>
                   {formData.photos.length} / 5 enviados
                 </span>
               </div>
-              <p className="text-xs text-zinc-400">Pode carregar fotos ou vídeos curtos de até 15 segundos. Tentativas de enviar fotos repetidas serão bloqueadas.</p>
+              <p className="text-xs text-zinc-400">Pode carregar fotos ou vídeos curtos de até 15 segundos.</p>
               
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
                 {formData.photos.map((url, idx) => (
@@ -412,14 +466,14 @@ export default function AnunciarPage() {
                     <button
                       type="button"
                       onClick={() => handleRemovePhoto(idx)}
-                      className="absolute top-2 right-2 bg-red-600 text-white rounded-full w-6 h-6 flex items-center text-xs justify-center opacity-90 hover:opacity-100 cursor-pointer"
+                      className="absolute top-2 right-2 bg-rose-600 text-white rounded-full w-6 h-6 flex items-center text-xs justify-center opacity-90 hover:opacity-100 cursor-pointer"
                     >
                       ✕
                     </button>
                   </div>
                 ))}
 
-                <label className="border-2 border-dashed border-zinc-800 hover:border-red-600 rounded-xl aspect-square flex flex-col items-center justify-center cursor-pointer transition bg-zinc-900/50">
+                <label className="border-2 border-dashed border-zinc-800 hover:border-rose-600 rounded-xl aspect-square flex flex-col items-center justify-center cursor-pointer transition bg-zinc-900/50">
                   <span className="text-2xl text-zinc-500">+</span>
                   <span className="text-[10px] text-zinc-400 mt-1 text-center px-1">{uploadingMedia ? 'A processar...' : 'Adicionar Mídia'}</span>
                   <input type="file" accept="image/*,video/*" multiple onChange={handleUploadMedia} className="hidden" disabled={uploadingMedia} />
@@ -427,9 +481,20 @@ export default function AnunciarPage() {
               </div>
             </div>
 
-            {/* Informações Principais */}
+            {/* Informações Principais & Geolocalização */}
             <div className="space-y-4">
-              <h2 className="text-sm font-bold text-red-500 uppercase tracking-wider">Informações Principais</h2>
+              <div className="flex justify-between items-center">
+                <h2 className="text-sm font-bold text-rose-500 uppercase tracking-wider">Informações Principais & Localização</h2>
+                <button
+                  type="button"
+                  onClick={handleDetectLocation}
+                  disabled={detectingLocation}
+                  className="text-xs font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-950/40 border border-emerald-800/60 px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5"
+                >
+                  📍 {detectingLocation ? 'Detectando GPS...' : 'Detectar minha localização atual'}
+                </button>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs text-zinc-400 mb-1">Nome Artístico / Título *</label>
@@ -438,7 +503,7 @@ export default function AnunciarPage() {
                     value={formData.artistic_name}
                     onChange={(e) => setFormData({ ...formData, artistic_name: e.target.value })}
                     placeholder="Ex: Fernanda Rocha"
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-red-600"
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-rose-600"
                     required
                   />
                 </div>
@@ -450,7 +515,7 @@ export default function AnunciarPage() {
                     value={formData.neighborhood}
                     onChange={(e) => setFormData({ ...formData, neighborhood: e.target.value })}
                     placeholder="Ex: Pinheiros"
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-red-600"
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-rose-600"
                     required
                   />
                 </div>
@@ -489,7 +554,7 @@ export default function AnunciarPage() {
 
             {/* Contato */}
             <div className="space-y-4">
-              <h2 className="text-sm font-bold text-red-500 uppercase tracking-wider">Meios de Contato</h2>
+              <h2 className="text-sm font-bold text-rose-500 uppercase tracking-wider">Meios de Contato</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs text-zinc-400 mb-1">WhatsApp</label>
@@ -503,10 +568,10 @@ export default function AnunciarPage() {
                 </div>
                 <div className="flex items-center gap-6 pt-5">
                   <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
-                    <input type="checkbox" checked={formData.phone_call} onChange={(e) => setFormData({ ...formData, phone_call: e.target.checked })} className="accent-red-600" /> Ligação
+                    <input type="checkbox" checked={formData.phone_call} onChange={(e) => setFormData({ ...formData, phone_call: e.target.checked })} className="accent-rose-600" /> Ligação
                   </label>
                   <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
-                    <input type="checkbox" checked={formData.telegram} onChange={(e) => setFormData({ ...formData, telegram: e.target.checked })} className="accent-red-600" /> Telegram
+                    <input type="checkbox" checked={formData.telegram} onChange={(e) => setFormData({ ...formData, telegram: e.target.checked })} className="accent-rose-600" /> Telegram
                   </label>
                 </div>
               </div>
@@ -514,38 +579,38 @@ export default function AnunciarPage() {
 
             {/* Atendimento a */}
             <div className="space-y-4">
-              <h2 className="text-sm font-bold text-red-500 uppercase tracking-wider">Atendimento a</h2>
+              <h2 className="text-sm font-bold text-rose-500 uppercase tracking-wider">Atendimento a</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <label className="flex items-center gap-2 text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 p-3 rounded-xl cursor-pointer">
-                  <input type="checkbox" checked={formData.atende_homens} onChange={(e) => setFormData({ ...formData, atende_homens: e.target.checked })} className="accent-red-600" /> Homens
+                  <input type="checkbox" checked={formData.atende_homens} onChange={(e) => setFormData({ ...formData, atende_homens: e.target.checked })} className="accent-rose-600" /> Homens
                 </label>
                 <label className="flex items-center gap-2 text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 p-3 rounded-xl cursor-pointer">
-                  <input type="checkbox" checked={formData.atende_mulheres} onChange={(e) => setFormData({ ...formData, atende_mulheres: e.target.checked })} className="accent-red-600" /> Mulheres
+                  <input type="checkbox" checked={formData.atende_mulheres} onChange={(e) => setFormData({ ...formData, atende_mulheres: e.target.checked })} className="accent-rose-600" /> Mulheres
                 </label>
                 <label className="flex items-center gap-2 text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 p-3 rounded-xl cursor-pointer">
-                  <input type="checkbox" checked={formData.atende_casais} onChange={(e) => setFormData({ ...formData, atende_casais: e.target.checked })} className="accent-red-600" /> Casais
+                  <input type="checkbox" checked={formData.atende_casais} onChange={(e) => setFormData({ ...formData, atende_casais: e.target.checked })} className="accent-rose-600" /> Casais
                 </label>
                 <label className="flex items-center gap-2 text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 p-3 rounded-xl cursor-pointer">
-                  <input type="checkbox" checked={formData.atende_deficientes} onChange={(e) => setFormData({ ...formData, atende_deficientes: e.target.checked })} className="accent-red-600" /> Deficientes Físicos
+                  <input type="checkbox" checked={formData.atende_deficientes} onChange={(e) => setFormData({ ...formData, atende_deficientes: e.target.checked })} className="accent-rose-600" /> Deficientes Físicos
                 </label>
               </div>
             </div>
 
             {/* Selos & Aparência */}
             <div className="space-y-4">
-              <h2 className="text-sm font-bold text-red-500 uppercase tracking-wider">Aparência e Selos</h2>
+              <h2 className="text-sm font-bold text-rose-500 uppercase tracking-wider">Aparência e Selos</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <label className="flex items-center gap-2 text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 p-3 rounded-xl cursor-pointer">
-                  <input type="checkbox" checked={formData.verified_photos} onChange={(e) => setFormData({ ...formData, verified_photos: e.target.checked })} className="accent-red-600" /> Fotos Verificadas
+                  <input type="checkbox" checked={formData.verified_photos} onChange={(e) => setFormData({ ...formData, verified_photos: e.target.checked })} className="accent-rose-600" /> Fotos Verificadas
                 </label>
                 <label className="flex items-center gap-2 text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 p-3 rounded-xl cursor-pointer">
-                  <input type="checkbox" checked={formData.visible_face} onChange={(e) => setFormData({ ...formData, visible_face: e.target.checked })} className="accent-red-600" /> Rosto Visível
+                  <input type="checkbox" checked={formData.visible_face} onChange={(e) => setFormData({ ...formData, visible_face: e.target.checked })} className="accent-rose-600" /> Rosto Visível
                 </label>
                 <label className="flex items-center gap-2 text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 p-3 rounded-xl cursor-pointer">
-                  <input type="checkbox" checked={formData.with_video} onChange={(e) => setFormData({ ...formData, with_video: e.target.checked })} className="accent-red-600" /> Com Vídeo
+                  <input type="checkbox" checked={formData.with_video} onChange={(e) => setFormData({ ...formData, with_video: e.target.checked })} className="accent-rose-600" /> Com Vídeo
                 </label>
                 <label className="flex items-center gap-2 text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 p-3 rounded-xl cursor-pointer">
-                  <input type="checkbox" checked={formData.with_audio} onChange={(e) => setFormData({ ...formData, with_audio: e.target.checked })} className="accent-red-600" /> Com Áudio
+                  <input type="checkbox" checked={formData.with_audio} onChange={(e) => setFormData({ ...formData, with_audio: e.target.checked })} className="accent-rose-600" /> Com Áudio
                 </label>
               </div>
 
@@ -585,7 +650,7 @@ export default function AnunciarPage() {
                 value={formData.bio}
                 onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
                 rows={4}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-4 text-xs text-white focus:outline-none focus:border-red-600"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-4 text-xs text-white focus:outline-none focus:border-rose-600"
               />
             </div>
 
@@ -602,15 +667,15 @@ export default function AnunciarPage() {
           <div className="space-y-4">
             <h2 className="text-sm font-bold text-white">Ativação de Destaque (PIX e Cartão)</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div onClick={() => setPlanoSelecionado({ id: 'semanal', title: 'Plano VIP Semanal', price: 20.00 })} className={`cursor-pointer border rounded-xl p-4 transition ${planoSelecionado.id === 'semanal' ? 'border-red-600 bg-red-950/20' : 'border-zinc-800 bg-zinc-950'}`}>
+              <div onClick={() => setPlanoSelecionado({ id: 'semanal', title: 'Plano VIP Semanal', price: 20.00 })} className={`cursor-pointer border rounded-xl p-4 transition ${planoSelecionado.id === 'semanal' ? 'border-rose-600 bg-rose-950/20' : 'border-zinc-800 bg-zinc-950'}`}>
                 <h3 className="text-xs font-bold text-zinc-400 uppercase">Semanal</h3>
                 <p className="text-xl font-black text-white mt-2">R$ 20,00</p>
               </div>
-              <div onClick={() => setPlanoSelecionado({ id: 'quinzenal', title: 'Plano VIP Quinzenal', price: 35.00 })} className={`cursor-pointer border rounded-xl p-4 transition ${planoSelecionado.id === 'quinzenal' ? 'border-red-600 bg-red-950/20' : 'border-zinc-800 bg-zinc-950'}`}>
+              <div onClick={() => setPlanoSelecionado({ id: 'quinzenal', title: 'Plano VIP Quinzenal', price: 35.00 })} className={`cursor-pointer border rounded-xl p-4 transition ${planoSelecionado.id === 'quinzenal' ? 'border-rose-600 bg-rose-950/20' : 'border-zinc-800 bg-zinc-950'}`}>
                 <h3 className="text-xs font-bold text-zinc-400 uppercase">Quinzenal</h3>
                 <p className="text-xl font-black text-white mt-2">R$ 35,00</p>
               </div>
-              <div onClick={() => setPlanoSelecionado({ id: 'mensal', title: 'Plano VIP Mensal', price: 50.00 })} className={`cursor-pointer border rounded-xl p-4 transition ${planoSelecionado.id === 'mensal' ? 'border-red-600 bg-red-950/20' : 'border-zinc-800 bg-zinc-950'}`}>
+              <div onClick={() => setPlanoSelecionado({ id: 'mensal', title: 'Plano VIP Mensal', price: 50.00 })} className={`cursor-pointer border rounded-xl p-4 transition ${planoSelecionado.id === 'mensal' ? 'border-rose-600 bg-rose-950/20' : 'border-zinc-800 bg-zinc-950'}`}>
                 <h3 className="text-xs font-bold text-zinc-400 uppercase">Mensal</h3>
                 <p className="text-xl font-black text-white mt-2">R$ 50,00</p>
               </div>
@@ -630,12 +695,11 @@ export default function AnunciarPage() {
               <button
                 onClick={handlePagarPlano}
                 disabled={paying}
-                className="w-full rounded-xl bg-emerald-600 py-3.5 text-xs font-bold text-white hover:bg-emerald-700 transition cursor-pointer disabled:opacity-50"
+                className="w-full rounded-xl bg-emerald-600 py-3.5 text-xs font-bold text-white hover:bg-emerald-500 transition cursor-pointer disabled:opacity-50 shadow-lg shadow-emerald-600/20"
               >
                 {paying ? 'A abrir checkout...' : `Pagar ${planoSelecionado.title} com PIX ou Cartão`}
               </button>
 
-              {/* BOTÃO DE TESTE LOCAL (SIMULAÇÃO GRATUITA) */}
               <button
                 onClick={handleSimularPagamentoGratis}
                 className="w-full rounded-xl bg-zinc-800 py-3 text-xs font-bold text-zinc-300 hover:bg-zinc-700 hover:text-white transition cursor-pointer border border-zinc-700"
