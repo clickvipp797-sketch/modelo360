@@ -4,8 +4,6 @@ import { useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 
-export const dynamic = 'force-dynamic';
-
 interface Profile {
   id: string;
   artistic_name: string;
