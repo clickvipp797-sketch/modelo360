@@ -42,22 +42,31 @@ function ProfileDetailContent() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Formulário de nova avaliação
   const [visitorName, setVisitorName] = useState('');
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
 
+  const trackInteraction = async (
+    interactionType: 'view' | 'whatsapp_click' | 'call_click' | 'telegram_click'
+  ) => {
+    if (!id) return;
+    await supabase.from('profile_interactions').insert({
+      profile_id: id,
+      interaction_type: interactionType,
+    });
+  };
+
   useEffect(() => {
     if (id) {
       fetchProfileAndReviews();
+      trackInteraction('view');
     }
   }, [id]);
 
   const fetchProfileAndReviews = async () => {
     setLoading(true);
 
-    // Buscar perfil e mídias diretamente da tabela profiles
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
       .select('*')
@@ -68,7 +77,6 @@ function ProfileDetailContent() {
       setProfile(profileData as unknown as Profile);
     }
 
-    // Buscar avaliações aprovadas
     const { data: reviewsData } = await supabase
       .from('profile_reviews')
       .select('*')
@@ -89,10 +97,10 @@ function ProfileDetailContent() {
 
     const { error } = await supabase.from('profile_reviews').insert({
       profile_id: id,
-      visitor_name: visitorName,
+      visitor_name: visitorName.trim() || 'Cliente',
       rating: Number(rating),
-      comment: comment,
-      status: 'pending'
+      comment: comment.trim(),
+      status: 'pending',
     });
 
     if (error) {
@@ -127,13 +135,13 @@ function ProfileDetailContent() {
   }
 
   const totalReviews = reviews.length;
-  const averageRating = totalReviews > 0
-    ? (reviews.reduce((acc, r) => acc + r.rating, 0) / totalReviews).toFixed(1)
-    : '5.0';
+  const averageRating =
+    totalReviews > 0
+      ? (reviews.reduce((acc, r) => acc + r.rating, 0) / totalReviews).toFixed(1)
+      : '5.0';
 
   return (
     <main className="min-h-screen bg-zinc-950 text-white pb-20">
-      {/* CABEÇALHO - MODELO 360 */}
       <header className="max-w-4xl mx-auto flex items-center justify-between px-4 py-4 border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-md sticky top-0 z-40">
         <Link href="/" className="flex items-center gap-2 group">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-rose-600 via-red-600 to-amber-500 flex items-center justify-center text-white font-black text-xs shadow-md shadow-rose-600/30">
@@ -149,8 +157,6 @@ function ProfileDetailContent() {
       </header>
 
       <div className="max-w-2xl mx-auto px-2 sm:px-4 py-6 space-y-6">
-
-        {/* GALERIA EM LISTA VERTICAL */}
         <div className="w-full space-y-4">
           {profile.photos && profile.photos.length > 0 ? (
             profile.photos.map((url, idx) => (
@@ -179,7 +185,6 @@ function ProfileDetailContent() {
           )}
         </div>
 
-        {/* CARTÃO DE IDENTIFICAÇÃO E CONTACTO */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-4 shadow-xl">
           <div>
             <div className="flex items-center justify-between mb-1">
@@ -205,6 +210,7 @@ function ProfileDetailContent() {
               href={`https://wa.me/55${profile.whatsapp.replace(/\D/g, '')}?text=Olá%20${encodeURIComponent(profile.artistic_name || '')},%20vi%20seu%20anúncio%20no%20Modelo360.`}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => trackInteraction('whatsapp_click')}
               className="block w-full text-center rounded-xl bg-emerald-600 py-3.5 text-xs font-bold text-white hover:bg-emerald-500 transition shadow-lg shadow-emerald-600/25"
             >
               💬 Contactar via WhatsApp
@@ -212,7 +218,6 @@ function ProfileDetailContent() {
           )}
         </div>
 
-        {/* ATRIBUTOS FÍSICOS */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-3 shadow-xl">
           <h2 className="text-xs font-bold text-rose-500 uppercase tracking-wider">📋 Características</h2>
           <div className="flex flex-wrap gap-2">
@@ -239,7 +244,6 @@ function ProfileDetailContent() {
           </div>
         </div>
 
-        {/* ATENDIMENTO A */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-3 shadow-xl">
           <h2 className="text-xs font-bold text-rose-500 uppercase tracking-wider">✨ Atendimento a</h2>
           <div className="flex flex-wrap gap-1.5">
@@ -250,7 +254,6 @@ function ProfileDetailContent() {
           </div>
         </div>
 
-        {/* BIOGRAFIA */}
         {profile.bio && (
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-3 shadow-xl">
             <h2 className="text-xs font-bold text-rose-500 uppercase tracking-wider">Sobre o Atendimento</h2>
@@ -259,7 +262,6 @@ function ProfileDetailContent() {
         )}
       </div>
 
-      {/* SECÇÃO DE AVALIAÇÕES */}
       <div className="max-w-4xl mx-auto px-4 mt-8 pt-8 border-t border-zinc-800">
         <h2 className="text-lg font-bold mb-6">Avaliações Verificadas ({totalReviews})</h2>
 
