@@ -7,9 +7,11 @@ import Link from 'next/link';
 
 interface ProfileReview {
   id: string;
-  reviewer_name: string;
+  visitor_name?: string;
+  reviewer_name?: string;
   rating: number;
   comment: string;
+  status: 'pending' | 'approved' | 'rejected' | string;
   created_at: string;
 }
 
@@ -150,6 +152,41 @@ export default function AnunciarPage() {
     loadUserDataAndProfile();
   }, [router]);
 
+  const handleUpdateReviewStatus = async (
+    reviewId: string,
+    nextStatus: 'approved' | 'rejected'
+  ) => {
+    const { error } = await supabase
+      .from('profile_reviews')
+      .update({ status: nextStatus })
+      .eq('id', reviewId);
+
+    if (error) {
+      alert('Erro ao atualizar avaliação: ' + error.message);
+      return;
+    }
+
+    setReviews((prev) =>
+      prev.map((rev) =>
+        rev.id === reviewId ? { ...rev, status: nextStatus } : rev
+      )
+    );
+  };
+
+  const handleDeleteReview = async (reviewId: string) => {
+    const { error } = await supabase
+      .from('profile_reviews')
+      .delete()
+      .eq('id', reviewId);
+
+    if (error) {
+      alert('Erro ao excluir avaliação: ' + error.message);
+      return;
+    }
+
+    setReviews((prev) => prev.filter((rev) => rev.id !== reviewId));
+  };
+
   const handleRegisterServiceDone = async () => {
     if (!profileId) {
       alert('⚠️ Guarde o perfil primeiro para registrar atendimentos.');
@@ -173,7 +210,6 @@ export default function AnunciarPage() {
     }
   };
 
-  // Função para detetar localização via GPS e Nominatim (OpenStreetMap)
   const handleDetectLocation = () => {
     if (!('geolocation' in navigator)) {
       alert('Geolocalização não suportada pelo seu navegador.');
@@ -537,7 +573,7 @@ export default function AnunciarPage() {
             <div>
               <h2 className="text-sm font-bold text-rose-500 uppercase tracking-wider">Desempenho, Cliques e Atendimentos</h2>
               <p className="text-xs text-zinc-400 mt-0.5">
-                Acompanhe cliques nos contatos, registre atendimentos realizados e veja as avaliações dos clientes.
+                Acompanhe cliques nos contatos, registre atendimentos realizados e aprove avaliações para o perfil.
               </p>
             </div>
             <button
@@ -582,12 +618,58 @@ export default function AnunciarPage() {
             ) : (
               <div className="space-y-2">
                 {reviews.map((rev) => (
-                  <div key={rev.id} className="bg-zinc-950 border border-zinc-800 p-3.5 rounded-xl space-y-1">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-bold text-white">{rev.reviewer_name || 'Cliente'}</span>
+                  <div key={rev.id} className="bg-zinc-950 border border-zinc-800 p-3.5 rounded-xl space-y-2">
+                    <div className="flex flex-wrap justify-between items-center gap-2 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white">{rev.visitor_name || rev.reviewer_name || 'Cliente'}</span>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            rev.status === 'approved'
+                              ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                              : rev.status === 'rejected'
+                              ? 'bg-rose-950 text-rose-400 border border-rose-800'
+                              : 'bg-amber-950 text-amber-300 border border-amber-800'
+                          }`}
+                        >
+                          {rev.status === 'approved'
+                            ? 'Aprovada'
+                            : rev.status === 'rejected'
+                            ? 'Oculta'
+                            : 'Pendente'}
+                        </span>
+                      </div>
                       <span className="text-amber-400 font-bold">{'★'.repeat(rev.rating)} ({rev.rating}/5)</span>
                     </div>
+
                     <p className="text-xs text-zinc-300">{rev.comment}</p>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      {rev.status !== 'approved' && (
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateReviewStatus(rev.id, 'approved')}
+                          className="bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold px-3 py-1 rounded-lg transition cursor-pointer"
+                        >
+                          Aprovar no Perfil
+                        </button>
+                      )}
+                      {rev.status === 'approved' && (
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateReviewStatus(rev.id, 'rejected')}
+                          className="bg-amber-600/20 border border-amber-700/60 hover:bg-amber-600/30 text-amber-300 text-[11px] font-bold px-3 py-1 rounded-lg transition cursor-pointer"
+                        >
+                          Ocultar
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteReview(rev.id)}
+                        className="bg-rose-950/60 border border-rose-800/60 hover:bg-rose-900/60 text-rose-300 text-[11px] font-bold px-3 py-1 rounded-lg transition cursor-pointer"
+                      >
+                        Excluir
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
