@@ -189,7 +189,7 @@ export default function AnunciarPage() {
 
   const handleRegisterServiceDone = async () => {
     if (!profileId) {
-      alert('⚠️ Guarde o perfil primeiro para registrar atendimentos.');
+      alert('Guarde o perfil primeiro para registrar atendimentos.');
       return;
     }
 
@@ -212,7 +212,7 @@ export default function AnunciarPage() {
 
   const handleDetectLocation = () => {
     if (!('geolocation' in navigator)) {
-      alert('Geolocalização não suportada pelo seu navegador.');
+      alert('Geolocalização não suportada pelo navegador.');
       return;
     }
 
@@ -236,7 +236,7 @@ export default function AnunciarPage() {
               latitude: lat,
               longitude: lon,
             }));
-            alert('📍 Localização e coordenadas detectadas com sucesso!');
+            alert('Localização e coordenadas detectadas com sucesso.');
           }
         } catch (e) {
           alert('Não foi possível obter o endereço exato.');
@@ -317,7 +317,7 @@ export default function AnunciarPage() {
       video.onloadedmetadata = () => {
         window.URL.revokeObjectURL(video.src);
         if (video.duration > 15.5) {
-          alert(`O vídeo "${file.name}" tem ${Math.round(video.duration)} segundos. O limite máximo é de 15 segundos!`);
+          alert(`O vídeo "${file.name}" tem ${Math.round(video.duration)} segundos. O limite máximo é de 15 segundos.`);
           resolve(false);
         } else {
           resolve(true);
@@ -347,7 +347,7 @@ export default function AnunciarPage() {
         );
 
         if (isAlreadyUploaded) {
-          alert(`⚠️ A mídia "${file.name}" já está presente no seu perfil e foi rejeitada.`);
+          alert(`A mídia "${file.name}" já está presente no perfil e foi rejeitada.`);
           continue;
         }
 
@@ -415,13 +415,13 @@ export default function AnunciarPage() {
 
     const uniquePhotos = Array.from(new Set(formData.photos));
     if (uniquePhotos.length !== formData.photos.length) {
-      alert('⚠️ Foram detetadas mídias duplicadas. Por favor, remova as cópias.');
+      alert('Foram detetadas mídias duplicadas. Remova as cópias antes de guardar.');
       setFormData({ ...formData, photos: uniquePhotos });
       return;
     }
 
     if (uniquePhotos.length < 5) {
-      alert(`⚠️ Atenção: Precisa de enviar no mínimo 5 fotos ou vídeos únicos. Atualmente tem ${uniquePhotos.length}.`);
+      alert(`É obrigatório enviar no mínimo 5 fotos ou vídeos únicos. Atualmente há ${uniquePhotos.length}.`);
       return;
     }
 
@@ -468,7 +468,7 @@ export default function AnunciarPage() {
           setProfileId(data.id);
           await loadMetricsAndReviews(data.id);
         }
-        alert('✨ Perfil e mídias guardados com sucesso no Modelo 360!');
+        alert('Perfil e mídias guardados com sucesso no Modelo 360.');
       }
     } catch (err) {
       alert('Erro de conexão com a base de dados.');
@@ -479,11 +479,11 @@ export default function AnunciarPage() {
 
   const handlePagarPlano = async () => {
     if (!formData.artistic_name.trim() || !profileId) {
-      alert('⚠️ Preencha o Nome Artístico e guarde o perfil antes de pagar.');
+      alert('Preencha o Nome Artístico e guarde o perfil antes de pagar.');
       return;
     }
     if (formData.photos.length < 5) {
-      alert('⚠️ É obrigatório ter pelo menos 5 fotos ou vídeos carregados.');
+      alert('É obrigatório ter pelo menos 5 fotos ou vídeos carregados.');
       return;
     }
 
@@ -495,14 +495,18 @@ export default function AnunciarPage() {
         body: JSON.stringify({
           title: planoSelecionado.title,
           price: planoSelecionado.price,
-          profileId: profileId
+          profileId: profileId,
         }),
       });
 
       const data = await response.json();
 
       if (data.init_point) {
-        window.location.href = data.init_point;
+        const openedWindow = window.open(data.init_point, '_blank', 'noopener,noreferrer');
+        if (!openedWindow) {
+          window.location.href = data.init_point;
+        }
+        setPaying(false);
       } else {
         alert('Erro ao gerar link de pagamento: ' + (data.error || 'Erro desconhecido'));
         setPaying(false);
@@ -515,11 +519,11 @@ export default function AnunciarPage() {
 
   const handleAtivar30DiasGratis = async () => {
     if (!formData.artistic_name.trim() || !profileId) {
-      alert('⚠️ Preencha o Nome Artístico e guarde o perfil antes de ativar.');
+      alert('Preencha o Nome Artístico e guarde o perfil antes de ativar.');
       return;
     }
     if (formData.photos.length < 5) {
-      alert('⚠️ É obrigatório ter pelo menos 5 fotos ou vídeos guardados.');
+      alert('É obrigatório ter pelo menos 5 fotos ou vídeos guardados.');
       return;
     }
 
@@ -543,7 +547,7 @@ export default function AnunciarPage() {
         return;
       }
 
-      alert('✨ Perfil ativado com 30 dias grátis no Modelo 360!');
+      alert('Perfil ativado com 30 dias grátis no Modelo 360.');
       router.push('/');
     } catch (err) {
       alert('Erro de conexão ao ativar os 30 dias grátis.');
@@ -758,7 +762,7 @@ export default function AnunciarPage() {
                   disabled={detectingLocation}
                   className="text-xs font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-950/40 border border-emerald-800/60 px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5"
                 >
-                  📍 {detectingLocation ? 'Detectando GPS...' : 'Detectar minha localização atual'}
+                  {detectingLocation ? 'Detectando GPS...' : 'Detectar minha localização atual'}
                 </button>
               </div>
 
