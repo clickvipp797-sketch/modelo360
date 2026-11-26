@@ -14,9 +14,11 @@ export default function AtualizarSenhaPage() {
   const [sessionReady, setSessionReady] = useState(false);
 
   useEffect(() => {
+    let active = true;
+
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
+      if (active && session) {
         setSessionReady(true);
       }
     };
@@ -24,20 +26,26 @@ export default function AtualizarSenhaPage() {
     checkSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY' || session) {
+      if (active && (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN' || session)) {
         setSessionReady(true);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const validarSenha = (valor: string) => {
-    return senhaForteRegex.test(valor);
-  };
+  const validarSenha = (valor: string) => senhaForteRegex.test(valor);
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!sessionReady) {
+      alert('Sessão inválida ou expirada. Solicite um novo link de recuperação em /login.');
+      return;
+    }
 
     if (!validarSenha(password)) {
       alert(
@@ -54,17 +62,19 @@ export default function AtualizarSenhaPage() {
     setLoading(true);
 
     const { error } = await supabase.auth.updateUser({
-      password: password,
+      password,
     });
 
     setLoading(false);
 
     if (error) {
       alert('Erro ao atualizar a senha: ' + error.message);
-    } else {
-      alert('Senha atualizada com sucesso!');
-      router.push('/login');
+      return;
     }
+
+    alert('Senha atualizada com sucesso!');
+    await supabase.auth.signOut();
+    router.push('/login');
   };
 
   return (
@@ -84,8 +94,8 @@ export default function AtualizarSenhaPage() {
             Mínimo de 8 caracteres com letra maiúscula, letra minúscula e caractere especial (ex.: @, #, !, $).
           </p>
           {!sessionReady && (
-            <p className="text-[11px] text-zinc-500">
-              Validando sessão de recuperação... Se abrir esta página sem o link do e-mail, solicite a recuperação em /login.
+            <p className="text-[11px] text-amber-400">
+              Validando link de recuperação... Se acessou direto sem o e-mail, peça o link em /login.
             </p>
           )}
         </div>
@@ -119,7 +129,7 @@ export default function AtualizarSenhaPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !sessionReady}
             className="w-full rounded-xl bg-red-600 py-3.5 text-xs font-bold text-white hover:bg-red-700 transition cursor-pointer disabled:opacity-50 shadow-lg shadow-red-600/20"
           >
             {loading ? 'Atualizando...' : 'Salvar Nova Senha'}

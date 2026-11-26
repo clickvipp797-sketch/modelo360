@@ -64,7 +64,7 @@ export default function LoginPage() {
     setSendingReset(true);
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/redefinir-senha`,
+      redirectTo: `${window.location.origin}/atualizar-senha`,
     });
 
     setSendingReset(false);
