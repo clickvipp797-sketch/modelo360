@@ -513,17 +513,42 @@ export default function AnunciarPage() {
     }
   };
 
-  const handleSimularPagamentoGratis = () => {
+  const handleAtivar30DiasGratis = async () => {
     if (!formData.artistic_name.trim() || !profileId) {
-      alert('⚠️ Preencha o Nome Artístico e guarde o perfil antes de simular.');
+      alert('⚠️ Preencha o Nome Artístico e guarde o perfil antes de ativar.');
       return;
     }
     if (formData.photos.length < 5) {
       alert('⚠️ É obrigatório ter pelo menos 5 fotos ou vídeos guardados.');
       return;
     }
-    alert('🧪 [MODO DE TESTE] Pagamento simulado com sucesso no Modelo 360!');
-    router.push('/');
+
+    try {
+      setPaying(true);
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          is_active: true,
+          plan_type: 'trial_30_days',
+          plan_expires_at: expiresAt,
+          last_seen_at: new Date().toISOString(),
+        })
+        .eq('id', profileId);
+
+      if (error) {
+        alert('Erro ao ativar os 30 dias grátis: ' + error.message);
+        setPaying(false);
+        return;
+      }
+
+      alert('✨ Perfil ativado com 30 dias grátis no Modelo 360!');
+      router.push('/');
+    } catch (err) {
+      alert('Erro de conexão ao ativar os 30 dias grátis.');
+      setPaying(false);
+    }
   };
 
   if (loading) {
@@ -944,10 +969,11 @@ export default function AnunciarPage() {
 
               <button
                 type="button"
-                onClick={handleSimularPagamentoGratis}
-                className="w-full rounded-xl bg-zinc-800 py-3 text-xs font-bold text-zinc-300 hover:bg-zinc-700 hover:text-white transition cursor-pointer"
+                onClick={handleAtivar30DiasGratis}
+                disabled={paying}
+                className="w-full rounded-xl bg-zinc-800 py-3 text-xs font-bold text-zinc-200 hover:bg-zinc-700 hover:text-white transition cursor-pointer disabled:opacity-50"
               >
-                🧪 [TESTE LOCAL] Simular Pagamento Grátis (Ativar Perfil)
+                {paying ? 'A ativar 30 dias grátis...' : 'Ativar 30 Dias Grátis'}
               </button>
             </div>
           </div>
