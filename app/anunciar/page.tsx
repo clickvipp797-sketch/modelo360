@@ -478,6 +478,8 @@ export default function AnunciarPage() {
   };
 
   const handlePagarPlano = async () => {
+    if (paying) return;
+
     if (!formData.artistic_name.trim() || !profileId) {
       alert('Preencha o Nome Artístico e guarde o perfil antes de pagar.');
       return;
@@ -487,8 +489,8 @@ export default function AnunciarPage() {
       return;
     }
 
+    setPaying(true);
     try {
-      setPaying(true);
       const response = await fetch('/api/pagamento', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -506,18 +508,19 @@ export default function AnunciarPage() {
         if (!openedWindow) {
           window.location.href = data.init_point;
         }
-        setPaying(false);
       } else {
         alert('Erro ao gerar link de pagamento: ' + (data.error || 'Erro desconhecido'));
-        setPaying(false);
       }
     } catch (err) {
       alert('Erro de conexão com o servidor de pagamentos.');
+    } finally {
       setPaying(false);
     }
   };
 
   const handleAtivar30DiasGratis = async () => {
+    if (paying) return;
+
     if (!formData.artistic_name.trim() || !profileId) {
       alert('Preencha o Nome Artístico e guarde o perfil antes de ativar.');
       return;
@@ -527,8 +530,8 @@ export default function AnunciarPage() {
       return;
     }
 
+    setPaying(true);
     try {
-      setPaying(true);
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
       const { error } = await supabase
@@ -585,6 +588,7 @@ export default function AnunciarPage() {
             )}
             <span className="text-xs text-zinc-400">{user?.email}</span>
             <button
+              type="button"
               onClick={async () => {
                 await supabase.auth.signOut();
                 router.push('/login');
@@ -964,6 +968,7 @@ export default function AnunciarPage() {
               </div>
 
               <button
+                type="button"
                 onClick={handlePagarPlano}
                 disabled={paying}
                 className="w-full rounded-xl bg-emerald-600 py-3.5 text-xs font-bold text-white hover:bg-emerald-500 transition cursor-pointer disabled:opacity-50 shadow-lg shadow-emerald-600/20"
