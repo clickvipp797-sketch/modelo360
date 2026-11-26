@@ -5,6 +5,14 @@ import { applyWatermarkToFile } from '@/lib/watermark';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
+interface ProfileReview {
+  id: string;
+  reviewer_name: string;
+  rating: number;
+  comment: string;
+  created_at: string;
+}
+
 export default function AnunciarPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -14,6 +22,16 @@ export default function AnunciarPage() {
   const [saving, setSaving] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [detectingLocation, setDetectingLocation] = useState(false);
+  const [registeringService, setRegisteringService] = useState(false);
+
+  const [stats, setStats] = useState({
+    views: 0,
+    whatsappClicks: 0,
+    callClicks: 0,
+    telegramClicks: 0,
+    servicesDone: 0,
+  });
+  const [reviews, setReviews] = useState<ProfileReview[]>([]);
 
   const [formData, setFormData] = useState({
     artistic_name: '',
@@ -49,6 +67,33 @@ export default function AnunciarPage() {
     title: 'Plano VIP Mensal',
     price: 50.00,
   });
+
+  const loadMetricsAndReviews = async (currentProfileId: string) => {
+    const { data: interactions } = await supabase
+      .from('profile_interactions')
+      .select('interaction_type')
+      .eq('profile_id', currentProfileId);
+
+    if (interactions) {
+      setStats({
+        views: interactions.filter((i) => i.interaction_type === 'view').length,
+        whatsappClicks: interactions.filter((i) => i.interaction_type === 'whatsapp_click').length,
+        callClicks: interactions.filter((i) => i.interaction_type === 'call_click').length,
+        telegramClicks: interactions.filter((i) => i.interaction_type === 'telegram_click').length,
+        servicesDone: interactions.filter((i) => i.interaction_type === 'service_done').length,
+      });
+    }
+
+    const { data: reviewData } = await supabase
+      .from('profile_reviews')
+      .select('*')
+      .eq('profile_id', currentProfileId)
+      .order('created_at', { ascending: false });
+
+    if (reviewData) {
+      setReviews(reviewData as ProfileReview[]);
+    }
+  };
 
   useEffect(() => {
     const loadUserDataAndProfile = async () => {
@@ -96,6 +141,7 @@ export default function AnunciarPage() {
           latitude: profileData.latitude || null,
           longitude: profileData.longitude || null,
         });
+        await loadMetricsAndReviews(profileData.id);
       }
 
       setLoading(false);
@@ -103,6 +149,29 @@ export default function AnunciarPage() {
 
     loadUserDataAndProfile();
   }, [router]);
+
+  const handleRegisterServiceDone = async () => {
+    if (!profileId) {
+      alert('⚠️ Guarde o perfil primeiro para registrar atendimentos.');
+      return;
+    }
+
+    setRegisteringService(true);
+    try {
+      const { error } = await supabase.from('profile_interactions').insert({
+        profile_id: profileId,
+        interaction_type: 'service_done',
+      });
+
+      if (error) {
+        alert('Erro ao registrar atendimento: ' + error.message);
+      } else {
+        setStats((prev) => ({ ...prev, servicesDone: prev.servicesDone + 1 }));
+      }
+    } finally {
+      setRegisteringService(false);
+    }
+  };
 
   // Função para detetar localização via GPS e Nominatim (OpenStreetMap)
   const handleDetectLocation = () => {
@@ -266,6 +335,7 @@ export default function AnunciarPage() {
             brandText: 'MODEL360',
             codeText,
             quality: 0.88,
+            opacity: 0.08,
           });
           finalExt = 'jpg';
         }
@@ -358,7 +428,10 @@ export default function AnunciarPage() {
       if (error) {
         alert('Erro ao guardar perfil: ' + error.message);
       } else {
-        if (data) setProfileId(data.id);
+        if (data) {
+          setProfileId(data.id);
+          await loadMetricsAndReviews(data.id);
+        }
         alert('✨ Perfil e mídias guardados com sucesso no Modelo 360!');
       }
     } catch (err) {
@@ -440,6 +513,11 @@ export default function AnunciarPage() {
             </span>
           </Link>
           <div className="flex items-center gap-4">
+            {profileId && (
+              <Link href={`/perfil/${profileId}`} className="text-xs text-emerald-400 hover:underline">
+                Ver Perfil Público
+              </Link>
+            )}
             <span className="text-xs text-zinc-400">{user?.email}</span>
             <button
               onClick={async () => {
@@ -452,6 +530,70 @@ export default function AnunciarPage() {
             </button>
           </div>
         </header>
+
+        {/* CLIQUES, ATENDIMENTOS REALIZADOS E AVALIAÇÕES */}
+        <section className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4 shadow-xl">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-rose-500 uppercase tracking-wider">Desempenho, Cliques e Atendimentos</h2>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Acompanhe cliques nos contatos, registre atendimentos realizados e veja as avaliações dos clientes.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleRegisterServiceDone}
+              disabled={registeringService}
+              className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition cursor-pointer"
+            >
+              {registeringService ? 'Registrando...' : '+ Registrar Atendimento Realizado'}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div className="bg-zinc-950 border border-zinc-800 p-3.5 rounded-xl">
+              <span className="text-[10px] text-zinc-400 block">Visualizações</span>
+              <strong className="text-lg font-black text-white">{stats.views}</strong>
+            </div>
+            <div className="bg-zinc-950 border border-zinc-800 p-3.5 rounded-xl">
+              <span className="text-[10px] text-zinc-400 block">Cliques WhatsApp</span>
+              <strong className="text-lg font-black text-emerald-400">{stats.whatsappClicks}</strong>
+            </div>
+            <div className="bg-zinc-950 border border-zinc-800 p-3.5 rounded-xl">
+              <span className="text-[10px] text-zinc-400 block">Cliques Ligação</span>
+              <strong className="text-lg font-black text-white">{stats.callClicks}</strong>
+            </div>
+            <div className="bg-zinc-950 border border-zinc-800 p-3.5 rounded-xl">
+              <span className="text-[10px] text-zinc-400 block">Cliques Telegram</span>
+              <strong className="text-lg font-black text-white">{stats.telegramClicks}</strong>
+            </div>
+            <div className="bg-zinc-950 border border-zinc-800 p-3.5 rounded-xl">
+              <span className="text-[10px] text-zinc-400 block">Atendimentos Feitos</span>
+              <strong className="text-lg font-black text-rose-400">{stats.servicesDone}</strong>
+            </div>
+          </div>
+
+          <div className="space-y-2.5 pt-2">
+            <h3 className="text-xs font-bold text-zinc-300">Avaliações dos Clientes ({reviews.length})</h3>
+            {reviews.length === 0 ? (
+              <p className="text-xs text-zinc-500 bg-zinc-950 border border-zinc-800/70 p-3.5 rounded-xl">
+                Ainda não há avaliações registradas para este perfil.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {reviews.map((rev) => (
+                  <div key={rev.id} className="bg-zinc-950 border border-zinc-800 p-3.5 rounded-xl space-y-1">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-bold text-white">{rev.reviewer_name || 'Cliente'}</span>
+                      <span className="text-amber-400 font-bold">{'★'.repeat(rev.rating)} ({rev.rating}/5)</span>
+                    </div>
+                    <p className="text-xs text-zinc-300">{rev.comment}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
 
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-8 shadow-xl">
           <div>
