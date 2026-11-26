@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { applyWatermarkToFile } from '@/lib/watermark';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -122,7 +123,7 @@ export default function AnunciarPage() {
           if (data && data.address) {
             const detectedCity = data.address.city || data.address.town || data.address.municipality || 'São Paulo';
             const detectedNeighborhood = data.address.suburb || data.address.neighbourhood || data.address.residential || '';
-            
+
             setFormData(prev => ({
               ...prev,
               city: detectedCity,
@@ -196,7 +197,7 @@ export default function AnunciarPage() {
               else reject(new Error('Erro ao comprimir imagem'));
             },
             'image/jpeg',
-            0.75 
+            0.75
           );
         };
       };
@@ -224,10 +225,11 @@ export default function AnunciarPage() {
 
   const handleUploadMedia = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files || files.length === 0) return;
+    if (!files || files.length === 0 || !user) return;
 
     setUploadingMedia(true);
     const newPhotos = [...formData.photos];
+    const codeText = `M360-${String(profileId || user.id).slice(0, 6).toUpperCase()}`;
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
@@ -235,8 +237,10 @@ export default function AnunciarPage() {
 
       try {
         const fileHash = await getFileHash(file);
-        const isAlreadyUploaded = newPhotos.some(url => url.includes(fileHash) || url.includes(file.name.replace(/\s+/g, '-')));
-        
+        const isAlreadyUploaded = newPhotos.some(
+          url => url.includes(fileHash) || url.includes(file.name.replace(/\s+/g, '-'))
+        );
+
         if (isAlreadyUploaded) {
           alert(`⚠️ A mídia "${file.name}" já está presente no seu perfil e foi rejeitada.`);
           continue;
@@ -248,12 +252,25 @@ export default function AnunciarPage() {
         }
 
         let fileToUpload: Blob | File = file;
+        let finalExt = file.name.split('.').pop() || 'bin';
+
         if (file.type.startsWith('image/')) {
-          fileToUpload = await compressImage(file);
+          const compressedBlob = await compressImage(file);
+          const baseName = file.name.replace(/\.[^/.]+$/, '');
+          const compressedFile = new File([compressedBlob], `${baseName}.jpg`, {
+            type: 'image/jpeg',
+            lastModified: Date.now(),
+          });
+
+          fileToUpload = await applyWatermarkToFile(compressedFile, {
+            brandText: 'MODEL360',
+            codeText,
+            quality: 0.88,
+          });
+          finalExt = 'jpg';
         }
 
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${user.id}-${fileHash}-${Date.now()}.${isVideo ? fileExt : 'jpg'}`;
+        const fileName = `${user.id}-${fileHash}-${Date.now()}.${finalExt}`;
         const filePath = `${fileName}`;
 
         const { error: uploadError } = await supabase.storage
@@ -279,6 +296,7 @@ export default function AnunciarPage() {
 
     setFormData({ ...formData, photos: newPhotos });
     setUploadingMedia(false);
+    e.target.value = '';
   };
 
   const handleRemovePhoto = (indexToRemove: number) => {
@@ -302,7 +320,7 @@ export default function AnunciarPage() {
     }
 
     setSaving(true);
-    
+
     try {
       const payload = {
         user_id: user.id,
@@ -373,7 +391,7 @@ export default function AnunciarPage() {
       });
 
       const data = await response.json();
-      
+
       if (data.init_point) {
         window.location.href = data.init_point;
       } else {
@@ -410,7 +428,7 @@ export default function AnunciarPage() {
   return (
     <main className="min-h-screen bg-zinc-950 text-white p-6">
       <div className="max-w-4xl mx-auto space-y-6">
-        
+
         {/* HEADER MODELO 360 */}
         <header className="flex items-center justify-between border-b border-zinc-800 pb-4">
           <Link href="/" className="flex items-center gap-2 group">
@@ -444,7 +462,7 @@ export default function AnunciarPage() {
           </div>
 
           <form onSubmit={handleSalvarAnuncio} className="space-y-6 border-b border-zinc-800 pb-8">
-            
+
             {/* GESTÃO DE FOTOS E VÍDEOS */}
             <div className="space-y-4 bg-zinc-950 p-4 rounded-xl border border-zinc-800">
               <div className="flex justify-between items-center">
@@ -454,7 +472,7 @@ export default function AnunciarPage() {
                 </span>
               </div>
               <p className="text-xs text-zinc-400">Pode carregar fotos ou vídeos curtos de até 15 segundos.</p>
-              
+
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
                 {formData.photos.map((url, idx) => (
                   <div key={idx} className="relative group aspect-square bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
@@ -701,8 +719,9 @@ export default function AnunciarPage() {
               </button>
 
               <button
+                type="button"
                 onClick={handleSimularPagamentoGratis}
-                className="w-full rounded-xl bg-zinc-800 py-3 text-xs font-bold text-zinc-300 hover:bg-zinc-700 hover:text-white transition cursor-pointer border border-zinc-700"
+                className="w-full rounded-xl bg-zinc-800 py-3 text-xs font-bold text-zinc-300 hover:bg-zinc-700 hover:text-white transition cursor-pointer"
               >
                 🧪 [TESTE LOCAL] Simular Pagamento Grátis (Ativar Perfil)
               </button>
