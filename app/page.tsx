@@ -14,24 +14,40 @@ interface Profile {
   photos: string[];
   latitude?: number;
   longitude?: number;
-  last_seen_at?: string; // Para saber se está online
+  last_seen_at?: string;
 }
 
 export default function HomePage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  // Estados de 18+ e Cookies
+  const [user, setUser] = useState<any>(null);
+
   const [isAdultConfirmed, setIsAdultConfirmed] = useState(false);
   const [cookiesAccepted, setCookiesAccepted] = useState(true);
-  
-  // Filtros e Localização do Cliente
+
   const [selectedGender, setSelectedGender] = useState('Mulheres');
   const [selectedCategory, setSelectedCategory] = useState('Acompanhantes');
   const [userCoords, setUserCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [userLocationName, setUserLocationName] = useState<{ city: string; neighborhood: string } | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
+
+    const loadSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (isMounted) {
+        setUser(session?.user ?? null);
+      }
+    };
+
+    loadSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (isMounted) {
+        setUser(session?.user ?? null);
+      }
+    });
+
     const confirmedAdult = localStorage.getItem('modelo360_adult_confirmed');
     const acceptedCookies = localStorage.getItem('modelo360_cookies_accepted');
 
@@ -44,13 +60,18 @@ export default function HomePage() {
     } else if (confirmedAdult === 'true') {
       setCookiesAccepted(false);
     }
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
     if (isAdultConfirmed) {
       fetchProfiles();
     }
-  }, [selectedGender, selectedCategory, userCoords]);
+  }, [selectedGender, selectedCategory, userCoords, isAdultConfirmed]);
 
   const handleConfirmAge = () => {
     localStorage.setItem('modelo360_adult_confirmed', 'true');
@@ -92,9 +113,8 @@ export default function HomePage() {
     }
   };
 
-  // Fórmula matemática para calcular a distância em KM entre duas coordenadas GPS
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371; // Raio da Terra em km
+    const R = 6371;
     const dLat = (lat2 - lat1) * (Math.PI / 180);
     const dLon = (lon2 - lon1) * (Math.PI / 180);
     const a =
@@ -102,7 +122,7 @@ export default function HomePage() {
       Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
       Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return Math.round(R * c); // Retorna a distância arredondada em km
+    return Math.round(R * c);
   };
 
   const fetchProfiles = async () => {
@@ -122,7 +142,7 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-zinc-950 text-white pb-16 relative">
-      
+
       {/* 1. MODAL 18+ */}
       {!isAdultConfirmed && (
         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-xl flex items-center justify-center p-4">
@@ -186,14 +206,34 @@ export default function HomePage() {
             )}
           </div>
         </Link>
-        
+
         <div className="flex items-center gap-3">
-          <Link href="/login" className="bg-zinc-900 border border-zinc-800 hover:border-zinc-700 px-4 py-2 rounded-xl text-xs font-bold transition text-zinc-300 hover:text-white">
-            Entrar
-          </Link>
-          <Link href="/anunciar" className="bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 px-4 py-2 rounded-xl text-xs font-bold transition text-white shadow-lg shadow-rose-600/25">
-            Anunciar 360
-          </Link>
+          {user ? (
+            <>
+              <span className="hidden sm:inline text-xs text-zinc-400 truncate max-w-[180px]">{user.email}</span>
+              <Link href="/anunciar" className="bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 px-4 py-2 rounded-xl text-xs font-bold transition text-white shadow-lg shadow-rose-600/25">
+                Meu Painel
+              </Link>
+              <button
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  setUser(null);
+                }}
+                className="bg-zinc-900 border border-zinc-800 hover:border-zinc-700 px-3 py-2 rounded-xl text-xs font-bold transition text-zinc-300 hover:text-white cursor-pointer"
+              >
+                Sair
+              </button>
+            </>
+          ) : (
+            <>
+              <Link href="/login" className="bg-zinc-900 border border-zinc-800 hover:border-zinc-700 px-4 py-2 rounded-xl text-xs font-bold transition text-zinc-300 hover:text-white">
+                Entrar
+              </Link>
+              <Link href="/anunciar" className="bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 px-4 py-2 rounded-xl text-xs font-bold transition text-white shadow-lg shadow-rose-600/25">
+                Anunciar 360
+              </Link>
+            </>
+          )}
         </div>
       </header>
 
@@ -240,13 +280,11 @@ export default function HomePage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {profiles.map((profile) => {
               const capaFoto = profile.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=600';
-              
-              // Verifica se está online (última atividade nos últimos 5 minutos)
-              const isOnline = profile.last_seen_at 
-                ? (new Date().getTime() - new Date(profile.last_seen_at).getTime()) < 5 * 60 * 1000 
+
+              const isOnline = profile.last_seen_at
+                ? (new Date().getTime() - new Date(profile.last_seen_at).getTime()) < 5 * 60 * 1000
                 : false;
 
-              // Calcula distância se o cliente permitiu geolocalização e a modelo tiver lat/lon cadastrada
               let distanciaKm = null;
               if (userCoords && profile.latitude && profile.longitude) {
                 distanciaKm = calculateDistance(userCoords.lat, userCoords.lon, profile.latitude, profile.longitude);
@@ -265,14 +303,12 @@ export default function HomePage() {
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                     />
 
-                    {/* SELO ONLINE NO CANTO SUPERIOR */}
                     {isOnline && (
                       <div className="absolute top-2 right-2 bg-emerald-500/90 backdrop-blur-md px-2 py-0.5 rounded-full text-[9px] font-extrabold text-white flex items-center gap-1 shadow-lg shadow-emerald-500/30 animate-pulse">
                         <span className="w-1.5 h-1.5 rounded-full bg-white"></span> ONLINE
                       </div>
                     )}
 
-                    {/* PREÇO NO CANTO INFERIOR ESQUERDO */}
                     {profile.price && (
                       <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-bold text-emerald-400 border border-zinc-800">
                         R$ {profile.price} / h
